@@ -25,13 +25,13 @@ test('WASM lossless output preserves exact PCM across containers', () => {
   assert.equal(expected.rate, 48000);
   assert.equal(expected.channels, 2);
   assert.equal(expected.samples.length, 12000);
-  for (const name of ['tone.flac', 'tone-alac.m4a', 'tone.aiff']) {
+  for (const name of ['tone.flac', 'tone-alac.m4a', 'tone.aiff', 'tone.mka']) {
     assert.deepEqual(decode(name), expected, name);
   }
 });
 
 test('WASM supports compressed audio and gapless MP3/Vorbis', () => {
-  for (const name of ['tone.mp3', 'tone.ogg', 'tone-aac.m4a', 'tone.aac']) {
+  for (const name of ['tone.mp3', 'tone.ogg', 'tone-aac.m4a', 'tone.aac', 'tone.mkv']) {
     const audio = decode(name);
     assert.equal(audio.rate, 48000);
     assert.equal(audio.channels, 2);
@@ -64,5 +64,8 @@ test('returned chunks survive subsequent decoding and free', () => {
   decoder.free();
   assert.deepEqual(first, snapshot);
   assert.throws(() => new AudioDecoder(new Uint8Array([1, 2, 3])));
+  assert.throws(
+    () => new AudioDecoder(readFileSync(new URL('fixtures/tone-opus.mka', import.meta.url))),
+  );
   assert.match(version(), /^\d+\.\d+\.\d+/);
 });

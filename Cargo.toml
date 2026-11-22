@@ -13,7 +13,7 @@ repository = "https://github.com/gumi-conqueror/audio-decode"
 [workspace.dependencies]
 audio-decode = { path = "crates/audio-decode", version = "0.1.0" }
 # Keep native consumers on the decoder version used by the prebuilt WASM package.
-symphonia = { version = "=0.6.1", default-features = false, features = ["wav", "pcm", "ogg", "vorbis", "flac", "mp3", "aac", "isomp4", "alac", "aiff", "id3v1", "id3v2", "ape"] }
+symphonia = { version = "=0.6.1", default-features = false, features = ["wav", "pcm", "ogg", "vorbis", "flac", "mp3", "aac", "isomp4", "mkv", "alac", "aiff", "id3v1", "id3v2", "ape"] }
 # The CLI must match this version exactly when it generates JavaScript bindings.
 wasm-bindgen = "=0.2.130"
 

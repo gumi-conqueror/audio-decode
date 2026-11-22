@@ -31,7 +31,7 @@ fn lossless_formats_preserve_rate_channels_and_pcm() {
     let (reference, expected) = decode("tone.wav");
     assert_eq!((reference.sample_rate, reference.channels), (48000, 2));
     assert_eq!(expected.len(), 12000);
-    for name in ["tone.flac", "tone-alac.m4a", "tone.aiff"] {
+    for name in ["tone.flac", "tone-alac.m4a", "tone.aiff", "tone.mka"] {
         let (info, samples) = decode(name);
         assert_eq!((info.sample_rate, info.channels), (48000, 2), "{name}");
         assert_eq!(samples, expected, "lossless PCM: {name}");
@@ -40,7 +40,13 @@ fn lossless_formats_preserve_rate_channels_and_pcm() {
 
 #[test]
 fn compressed_formats_preserve_stereo_and_nonempty_output() {
-    for name in ["tone.mp3", "tone.ogg", "tone-aac.m4a", "tone.aac"] {
+    for name in [
+        "tone.mp3",
+        "tone.ogg",
+        "tone-aac.m4a",
+        "tone.aac",
+        "tone.mkv",
+    ] {
         let (info, samples) = decode(name);
         assert_eq!((info.sample_rate, info.channels), (48000, 2), "{name}");
         assert!(samples.iter().all(|value| value.is_finite()), "{name}");
@@ -98,6 +104,7 @@ fn malformed_input_is_reported() {
         vec![],
         b"not audio".to_vec(),
         fixture("tone.flac")[..20].to_vec(),
+        fixture("tone-opus.mka"),
     ] {
         assert!(Decoder::from_bytes(bytes).is_err());
     }

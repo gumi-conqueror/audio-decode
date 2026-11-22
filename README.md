@@ -8,6 +8,7 @@ The wrapper code is MIT. Symphonia remains MPL-2.0.
 Use formats that Symphonia already supports. A new format does not justify another codec toolchain by itself.
 The initial selection includes WAV PCM, AIFF PCM, FLAC, Ogg Vorbis, MP3, AAC-LC and ALAC.
 AAC supports ADTS and MP4/M4A. HE-AAC, Opus, APE audio and WavPack are not included.
+Matroska (MKV/MKA) supports the enabled audio codecs; it does not add Opus support or video playback.
 The `ape` Cargo feature only reads APE metadata.
 
 The decoder detects file contents and selects the default audio track.

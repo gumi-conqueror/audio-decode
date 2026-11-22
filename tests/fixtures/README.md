@@ -10,3 +10,5 @@ It contains a synthetic 440 Hz mono tone at 44.1 kHz for 0.3 seconds.
 It checks the final buffered Ogg page.
 
 All fixture audio is synthetic. These files contain no recorded or third-party music.
+
+`tone.mka` stores FLAC in Matroska, and `tone.mkv` stores AAC. `tone-opus.mka` verifies that a supported container does not imply support for its Opus codec.

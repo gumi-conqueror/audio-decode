@@ -8,5 +8,7 @@
 *.ogg binary
 *.aac binary
 *.m4a binary
+*.mka binary
+*.mkv binary
 *.wasm binary
 *.tgz binary

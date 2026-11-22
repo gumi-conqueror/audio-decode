@@ -37,6 +37,9 @@ for (const [name, codec] of [
   ['tone.aac', 'aac'],
   ['tone-alac.m4a', 'alac'],
   ['tone.aiff', 'pcm_s16be'],
+  ['tone.mka', 'flac'],
+  ['tone.mkv', 'aac'],
+  ['tone-opus.mka', 'libopus'],
 ]) {
   execFileSync(
     'ffmpeg',

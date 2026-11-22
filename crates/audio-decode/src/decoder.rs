@@ -35,6 +35,12 @@ impl fmt::Display for DecodeError {
 
 impl std::error::Error for DecodeError {}
 
+impl From<io::Error> for DecodeError {
+    fn from(error: io::Error) -> Self {
+        Self(error.to_string())
+    }
+}
+
 impl From<symphonia::core::errors::Error> for DecodeError {
     fn from(error: symphonia::core::errors::Error) -> Self {
         Self(error.to_string())
@@ -91,8 +97,17 @@ impl Decoder {
     /// # Errors
     /// Returns an error if detection or the first audio packet fails.
     /// An unsupported default audio track is reported instead of selecting another track.
-    pub fn open(source: impl Read + Seek + Send + Sync + 'static) -> Result<Self, DecodeError> {
-        let stream = MediaSourceStream::new(Box::new(Source(source)), Default::default());
+    pub fn open(mut source: impl Read + Seek + Send + Sync + 'static) -> Result<Self, DecodeError> {
+        // Matroska needs the source length to distinguish EOF from a truncated element.
+        let length = source.seek(SeekFrom::End(0))?;
+        source.rewind()?;
+        let stream = MediaSourceStream::new(
+            Box::new(Source {
+                inner: source,
+                length,
+            }),
+            Default::default(),
+        );
         let format = symphonia::default::get_probe().probe(
             &Hint::new(),
             stream,
@@ -184,17 +199,20 @@ impl Decoder {
     }
 }
 
-struct Source<R>(R);
+struct Source<R> {
+    inner: R,
+    length: u64,
+}
 
 impl<R: Read> Read for Source<R> {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
-        self.0.read(buffer)
+        self.inner.read(buffer)
     }
 }
 
 impl<R: Seek> Seek for Source<R> {
     fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
-        self.0.seek(position)
+        self.inner.seek(position)
     }
 }
 
@@ -204,6 +222,6 @@ impl<R: Read + Seek + Send + Sync> MediaSource for Source<R> {
     }
 
     fn byte_len(&self) -> Option<u64> {
-        None
+        Some(self.length)
     }
 }
