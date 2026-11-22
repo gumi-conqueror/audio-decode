@@ -1,0 +1,12 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.wav binary
+*.aiff binary
+*.flac binary
+*.mp3 binary
+*.ogg binary
+*.aac binary
+*.m4a binary
+*.wasm binary
+*.tgz binary
