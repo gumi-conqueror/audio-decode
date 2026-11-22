@@ -105,10 +105,14 @@ try {
 } catch {
   /* Initial local checkout. */
 }
+const changes = capture('git', ['status', '--porcelain']);
+if (process.env.GITHUB_ACTIONS === 'true' && changes) {
+  throw new Error(`CI build changed the source checkout:\n${changes}`);
+}
 const info = {
   version,
   commit,
-  dirty: capture('git', ['status', '--porcelain']).length > 0,
+  dirty: changes.length > 0,
   profile: 'release',
   target: 'wasm32-unknown-unknown',
   rustc: capture('rustc', ['--version']),
