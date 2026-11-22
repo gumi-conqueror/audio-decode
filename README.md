@@ -11,14 +11,16 @@ AAC supports ADTS and MP4/M4A. HE-AAC, Opus, APE audio and WavPack are not inclu
 Matroska (MKV/MKA) supports the enabled audio codecs; it does not add Opus support or video playback.
 The `ape` Cargo feature only reads APE metadata.
 
-The decoder detects file contents and selects the default audio track.
+The decoder detects file contents and selects one audio track through Symphonia.
+For Matroska, an omitted `FlagDefault` can cause selection of the first audio track even when another track is implicitly the default.
+Track selection is not exposed by this wrapper. Extract the desired track before decoding if needed.
 It returns interleaved Float32 chunks at the decoded sample rate and channel count.
 It does not resample, downmix, apply ReplayGain, play audio, or export files.
 Callers must apply their own channel and precision policy.
 Changing sample rate or channel layout within a stream is an error.
 Corrupt packets are reported instead of silently omitted.
 
-MP3 and Vorbis use supported gapless metadata. AAC/MP4 does not promise sample-exact gapless editing in Symphonia 0.6.1.
+MP3 and Vorbis use supported gapless metadata. AAC can retain encoder delay and padding in Symphonia 0.6.1, including in MP4 and Matroska.
 Float32 output does not preserve every bit of 32-bit integer PCM.
 
 ## Native
