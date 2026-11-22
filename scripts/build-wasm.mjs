@@ -56,6 +56,7 @@ const manifest = {
     '.': { types: './index.d.ts', import: './index.js' },
     './index_bg.wasm': './index_bg.wasm',
     './build-info.json': './build-info.json',
+    './THIRD_PARTY_NOTICES.txt': './THIRD_PARTY_NOTICES.txt',
   },
   files: [
     'index.js',

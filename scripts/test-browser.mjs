@@ -46,6 +46,7 @@ writeFileSync(
   `
 import init, { AudioDecoder, version } from '@gumi-conqueror/audio-decode';
 import wasmUrl from '@gumi-conqueror/audio-decode/index_bg.wasm?url';
+import notices from '@gumi-conqueror/audio-decode/THIRD_PARTY_NOTICES.txt?raw';
 try {
   await init({ module_or_path: wasmUrl });
   const bytes = new Uint8Array(await (await fetch('/tone.flac')).arrayBuffer());
@@ -58,7 +59,7 @@ try {
       frames += samples.length / decoder.channels;
       for (const sample of samples) energy += sample * sample;
     }
-    postMessage({ rate: decoder.sampleRate, channels: decoder.channels, frames, energy, version: version() });
+    postMessage({ rate: decoder.sampleRate, channels: decoder.channels, frames, energy, version: version(), notices: notices.includes('MPL-2.0') });
   } finally { decoder.free(); }
 } catch (error) { postMessage({ error: String(error) }); }
 `,
@@ -109,6 +110,7 @@ try {
     { rate: 48000, channels: 2, frames: 6000, version },
   );
   assert.ok(result.energy > 100);
+  assert.equal(result.notices, true, 'Consumers can bundle the embedded dependency notices');
   assert.deepEqual(errors, []);
   assert.equal(wasmRequests.length, 1, 'Load exactly one bundled WASM asset');
   assert.equal(wasmRequests[0].status(), 200);
