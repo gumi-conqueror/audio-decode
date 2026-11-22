@@ -1,0 +1,145 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      browser-image: ${{ steps.browser.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: rustup toolchain install --no-self-update
+      - run: cargo fmt --all --check
+      - name: Check JavaScript syntax and release selection
+        run: |
+          for file in scripts/*.mjs tests/*.mjs; do node --check "$file"; done
+          node --test tests/release.test.mjs
+      - name: Select the browser image from the lockfile
+        id: browser
+        run: |
+          node -e 'console.log("image=mcr.microsoft.com/playwright:v" + require("./package-lock.json").packages["node_modules/playwright"].version + "-noble")' >> "$GITHUB_OUTPUT"
+
+  native:
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      CARGO_TARGET_DIR: target
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --no-self-update
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: native-debug-${{ runner.os }}-${{ runner.arch }}
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      - run: cargo test --locked -p audio-decode
+      - run: cargo clippy --locked -p audio-decode --all-targets -- -D warnings
+      - run: cargo doc --locked -p audio-decode --no-deps
+
+  wasm:
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CARGO_TARGET_DIR: target
+      WASM_PACK_CACHE: ${{ github.workspace }}/.wasm-pack-cache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Install the pinned compiler and WASM target before caching
+        run: |
+          rustup toolchain install --no-self-update
+          rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: wasm32-release-linux-x64
+          cache-directories: .wasm-pack-cache
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      - name: Install the pinned packaging tool if absent
+        run: |
+          if [[ "$(wasm-pack --version 2>/dev/null || true)" != 'wasm-pack 0.14.0' ]]; then
+            cargo install wasm-pack --version 0.14.0 --locked
+          fi
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: cargo clippy --locked -p audio-decode-wasm --target wasm32-unknown-unknown --release -- -D warnings
+      - run: npm test
+      - run: npm run package
+      - name: Pass the exact package to browser validation and release promotion
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wasm-${{ github.sha }}
+          path: release/*
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
+
+  browser:
+    needs: [quality, wasm]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container:
+      image: ${{ needs.quality.outputs.browser-image }}
+      options: --user 1001 --ipc=host
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: wasm-${{ github.sha }}
+          path: release
+      - run: npm run test:browser
+
+  required:
+    if: always()
+    needs: [quality, native, wasm, browser]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every check
+        env:
+          QUALITY: ${{ needs.quality.result }}
+          NATIVE: ${{ needs.native.result }}
+          WASM: ${{ needs.wasm.result }}
+          BROWSER: ${{ needs.browser.result }}
+        run: |
+          test "$QUALITY" = success
+          test "$NATIVE" = success
+          test "$WASM" = success
+          test "$BROWSER" = success

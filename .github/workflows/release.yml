@@ -1,0 +1,46 @@
+name: Publish verified decoder package
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Find the successful build of this exact main commit
+        id: source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/release.mjs select
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.source.outputs.artifact-id }}
+          run-id: ${{ steps.source.outputs.run-id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: release
+          merge-multiple: true
+      - name: Verify and publish the tested package without rebuilding
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/release.mjs publish
