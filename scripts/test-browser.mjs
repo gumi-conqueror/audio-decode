@@ -4,10 +4,12 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } fro
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { build, preview } from 'vite';
+import { packageFilename } from './release.mjs';
 
 if (!process.env.npm_execpath) throw new Error('Run this command through npm run test:browser');
 const { version } = JSON.parse(readFileSync('release/build-info.json', 'utf8'));
-const tarball = resolve(`release/gumi-conqueror-audio-decode-${version}.tgz`);
+const tarball = resolve(`release/${packageFilename(version)}`);
+const tone = JSON.parse(readFileSync('tests/fixtures/tone.json', 'utf8'));
 mkdirSync('test-artifacts', { recursive: true });
 const consumer = mkdtempSync(resolve('test-artifacts/consumer-'));
 writeFileSync(
@@ -107,9 +109,14 @@ try {
       frames: result.frames,
       version: result.version,
     },
-    { rate: 48000, channels: 2, frames: 6000, version },
+    { rate: tone.sampleRate, channels: tone.channels, frames: tone.frames, version },
   );
-  assert.ok(result.energy > 100);
+  // A quarter of the expected sine energy: frames × (amplitude / 32768)² / 2 per channel.
+  const expectedEnergy = tone.amplitudes.reduce(
+    (sum, amplitude) => sum + (tone.frames * (amplitude / 32768) ** 2) / 2,
+    0,
+  );
+  assert.ok(result.energy > expectedEnergy / 4, `energy ${result.energy}`);
   assert.equal(result.notices, true, 'Consumers can bundle the embedded dependency notices');
   assert.deepEqual(errors, []);
   assert.equal(wasmRequests.length, 1, 'Load exactly one bundled WASM asset');

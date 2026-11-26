@@ -2,7 +2,7 @@
 
 `tone.wav` contains 6,000 stereo PCM16 frames at 48 kHz.
 The left channel is a 440 Hz tone at amplitude 8,192. The right is an 880 Hz tone at amplitude 4,096.
-`npm run fixtures` creates that WAV and transcodes it with FFmpeg into FLAC, MP3, Vorbis, AAC, ALAC and AIFF.
+`npm run fixtures` creates that WAV and `tone.json`, which records these parameters for the tests. It then transcodes the WAV with FFmpeg into FLAC, MP3, Vorbis, AAC, ALAC and AIFF.
 FFmpeg is a fixture-generation tool. It is not linked into either decoder output.
 
 `generated-tone.ogg` comes from the MIT woslicer-dx test suite.

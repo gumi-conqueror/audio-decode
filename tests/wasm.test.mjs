@@ -5,6 +5,11 @@ import init, { AudioDecoder, version } from '../pkg/index.js';
 
 await init({ module_or_path: readFileSync(new URL('../pkg/index_bg.wasm', import.meta.url)) });
 
+const tone = JSON.parse(readFileSync(new URL('fixtures/tone.json', import.meta.url), 'utf8'));
+const toneSamples = tone.frames * tone.channels;
+// Energy of a full-scale-normalized sine: frames × (amplitude / 32768)² / 2.
+const toneEnergy = tone.amplitudes.map((amplitude) => (tone.frames * (amplitude / 32768) ** 2) / 2);
+
 function decode(name) {
   const decoder = new AudioDecoder(readFileSync(new URL(`fixtures/${name}`, import.meta.url)));
   try {
@@ -22,9 +27,9 @@ function decode(name) {
 
 test('WASM lossless output preserves exact PCM across containers', () => {
   const expected = decode('tone.wav');
-  assert.equal(expected.rate, 48000);
-  assert.equal(expected.channels, 2);
-  assert.equal(expected.samples.length, 12000);
+  assert.equal(expected.rate, tone.sampleRate);
+  assert.equal(expected.channels, tone.channels);
+  assert.equal(expected.samples.length, toneSamples);
   for (const name of ['tone.flac', 'tone-alac.m4a', 'tone.aiff', 'tone.mka']) {
     assert.deepEqual(decode(name), expected, name);
   }
@@ -33,17 +38,21 @@ test('WASM lossless output preserves exact PCM across containers', () => {
 test('WASM supports compressed audio and gapless MP3/Vorbis', () => {
   for (const name of ['tone.mp3', 'tone.ogg', 'tone-aac.m4a', 'tone.aac', 'tone.mkv']) {
     const audio = decode(name);
-    assert.equal(audio.rate, 48000);
-    assert.equal(audio.channels, 2);
+    assert.equal(audio.rate, tone.sampleRate);
+    assert.equal(audio.channels, tone.channels);
     assert.ok(audio.samples.every(Number.isFinite));
-    if (name === 'tone.mp3' || name === 'tone.ogg') assert.equal(audio.samples.length, 12000, name);
-    else assert.ok(audio.samples.length >= 12000 && audio.samples.length <= 18000, name);
+    const length = audio.samples.length;
+    if (name === 'tone.mp3' || name === 'tone.ogg') assert.equal(length, toneSamples, name);
+    // AAC/MP4 gapless editing is not promised by Symphonia 0.6.1.
+    else assert.ok(length >= toneSamples && length <= toneSamples * 1.5, `${name}: ${length}`);
     const energy = [0, 0];
     audio.samples.forEach((value, index) => {
       energy[index % 2] += value * value;
     });
-    assert.ok(energy[0] > 50 && energy[1] > 10, name);
-    assert.ok(energy[0] / energy[1] > 3 && energy[0] / energy[1] < 5, name);
+    const expectedRatio = toneEnergy[0] / toneEnergy[1];
+    assert.ok(energy.every((value, channel) => value > toneEnergy[channel] / 4), `${name}: ${energy}`);
+    const ratio = energy[0] / energy[1];
+    assert.ok(Math.abs(ratio / expectedRatio - 1) < 0.25, `stereo channel order: ${name}: ${ratio}`);
   }
 });
 
@@ -63,9 +72,15 @@ test('returned chunks survive subsequent decoding and free', () => {
   }
   decoder.free();
   assert.deepEqual(first, snapshot);
+});
+
+test('rejects data that is not audio and codecs that are not enabled', () => {
   assert.throws(() => new AudioDecoder(new Uint8Array([1, 2, 3])));
   assert.throws(
     () => new AudioDecoder(readFileSync(new URL('fixtures/tone-opus.mka', import.meta.url))),
   );
+});
+
+test('reports a semantic version', () => {
   assert.match(version(), /^\d+\.\d+\.\d+/);
 });

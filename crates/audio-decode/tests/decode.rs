@@ -14,6 +14,32 @@ fn fixture(name: &str) -> Vec<u8> {
     .expect("synthetic fixture exists")
 }
 
+/// Parameters that `scripts/generate-fixtures.mjs` used for `tone.wav`.
+struct Tone {
+    sample_rate: u32,
+    channels: usize,
+    samples: usize,
+    /// Energy of each channel's sine, normalized to full scale: frames × (amplitude / 32768)² / 2.
+    energy: [f32; 2],
+}
+
+fn tone() -> Tone {
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fixture("tone.json")).expect("fixture manifest");
+    let number = |key: &str| manifest[key].as_u64().expect("manifest number");
+    let frames = number("frames");
+    let amplitude = |channel: usize| {
+        let value = manifest["amplitudes"][channel].as_u64().expect("amplitude") as f32;
+        frames as f32 * (value / 32768.0).powi(2) / 2.0
+    };
+    Tone {
+        sample_rate: u32::try_from(number("sampleRate")).expect("sample rate"),
+        channels: usize::try_from(number("channels")).expect("channels"),
+        samples: usize::try_from(frames * number("channels")).expect("sample count"),
+        energy: [amplitude(0), amplitude(1)],
+    }
+}
+
 fn decode(name: &str) -> (audio_decode::AudioInfo, Vec<f32>) {
     let mut decoder = Decoder::from_bytes(fixture(name)).expect("open synthetic audio");
     let info = decoder.info().clone();
@@ -28,18 +54,27 @@ fn decode(name: &str) -> (audio_decode::AudioInfo, Vec<f32>) {
 
 #[test]
 fn lossless_formats_preserve_rate_channels_and_pcm() {
+    let tone = tone();
     let (reference, expected) = decode("tone.wav");
-    assert_eq!((reference.sample_rate, reference.channels), (48000, 2));
-    assert_eq!(expected.len(), 12000);
+    assert_eq!(
+        (reference.sample_rate, reference.channels),
+        (tone.sample_rate, tone.channels)
+    );
+    assert_eq!(expected.len(), tone.samples);
     for name in ["tone.flac", "tone-alac.m4a", "tone.aiff", "tone.mka"] {
         let (info, samples) = decode(name);
-        assert_eq!((info.sample_rate, info.channels), (48000, 2), "{name}");
+        assert_eq!(
+            (info.sample_rate, info.channels),
+            (tone.sample_rate, tone.channels),
+            "{name}"
+        );
         assert_eq!(samples, expected, "lossless PCM: {name}");
     }
 }
 
 #[test]
 fn compressed_formats_preserve_stereo_and_nonempty_output() {
+    let tone = tone();
     for name in [
         "tone.mp3",
         "tone.ogg",
@@ -48,14 +83,18 @@ fn compressed_formats_preserve_stereo_and_nonempty_output() {
         "tone.mkv",
     ] {
         let (info, samples) = decode(name);
-        assert_eq!((info.sample_rate, info.channels), (48000, 2), "{name}");
+        assert_eq!(
+            (info.sample_rate, info.channels),
+            (tone.sample_rate, tone.channels),
+            "{name}"
+        );
         assert!(samples.iter().all(|value| value.is_finite()), "{name}");
         if name == "tone.mp3" || name == "tone.ogg" {
-            assert_eq!(samples.len(), 12000, "gapless frame count: {name}");
+            assert_eq!(samples.len(), tone.samples, "gapless frame count: {name}");
         } else {
             // AAC/MP4 gapless editing is not promised by Symphonia 0.6.1.
             assert!(
-                (12000..=18000).contains(&samples.len()),
+                (tone.samples..=tone.samples * 3 / 2).contains(&samples.len()),
                 "AAC padding: {name}"
             );
         }
@@ -66,10 +105,15 @@ fn compressed_formats_preserve_stereo_and_nonempty_output() {
             .step_by(2)
             .map(|value| value * value)
             .sum();
-        assert!(left > 50.0 && right > 10.0, "non-silent output: {name}");
         assert!(
-            (3.0..5.0).contains(&(left / right)),
-            "stereo channel order: {name}"
+            left > tone.energy[0] / 4.0 && right > tone.energy[1] / 4.0,
+            "non-silent output: {name}: {left}, {right}"
+        );
+        let expected_ratio = tone.energy[0] / tone.energy[1];
+        assert!(
+            ((left / right) / expected_ratio - 1.0).abs() < 0.25,
+            "stereo channel order: {name}: {}",
+            left / right
         );
     }
 }
@@ -88,7 +132,7 @@ fn input_detection_does_not_require_a_filename() {
     let riff_len = u32::try_from(bytes.len() - 8).expect("small fixture");
     bytes[4..8].copy_from_slice(&riff_len.to_le_bytes());
     let mut decoder = Decoder::from_bytes(bytes).expect("WAV with an extra chunk");
-    assert_eq!(decoder.info().sample_rate, 48000);
+    assert_eq!(decoder.info().sample_rate, tone().sample_rate);
     assert!(
         !decoder
             .next_chunk()
@@ -118,5 +162,5 @@ fn native_file_sources_and_early_cancellation_work() {
     assert!(decoder.next_chunk().expect("first chunk").is_some());
     drop(decoder);
     let replacement = Decoder::from_bytes(fixture("tone.mp3")).expect("replacement source");
-    assert_eq!(replacement.info().sample_rate, 48000);
+    assert_eq!(replacement.info().sample_rate, tone().sample_rate);
 }

@@ -3,8 +3,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 
 const directory = new URL('../tests/fixtures/', import.meta.url);
 mkdirSync(directory, { recursive: true });
-const frames = 6000;
-const rate = 48000;
+// The tests read these values from tone.json instead of repeating them.
+const tone = { sampleRate: 48000, channels: 2, frames: 6000, amplitudes: [8192, 4096] };
+const { frames, sampleRate: rate } = tone;
 const bytes = Buffer.alloc(44 + frames * 4);
 bytes.write('RIFF');
 bytes.writeUInt32LE(bytes.length - 8, 4);
@@ -20,15 +21,17 @@ bytes.write('data', 36);
 bytes.writeUInt32LE(frames * 4, 40);
 for (let frame = 0; frame < frames; frame++) {
   bytes.writeInt16LE(
-    Math.round(8192 * Math.sin((2 * Math.PI * 440 * frame) / rate)),
+    Math.round(tone.amplitudes[0] * Math.sin((2 * Math.PI * 440 * frame) / rate)),
     44 + frame * 4,
   );
   bytes.writeInt16LE(
-    Math.round(4096 * Math.sin((2 * Math.PI * 880 * frame) / rate)),
+    Math.round(tone.amplitudes[1] * Math.sin((2 * Math.PI * 880 * frame) / rate)),
     46 + frame * 4,
   );
 }
 writeFileSync(new URL('tone.wav', directory), bytes);
+writeFileSync(new URL('tone.json', directory), `${JSON.stringify(tone, null, 2)}
+`);
 for (const [name, codec] of [
   ['tone.flac', 'flac'],
   ['tone.mp3', 'libmp3lame'],

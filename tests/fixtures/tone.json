@@ -1,0 +1,9 @@
+{
+  "sampleRate": 48000,
+  "channels": 2,
+  "frames": 6000,
+  "amplitudes": [
+    8192,
+    4096
+  ]
+}
