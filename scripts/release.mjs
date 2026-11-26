@@ -5,6 +5,13 @@ import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+/** Stable release tags; the package version is the tag without its `v`. */
+export const RELEASE_TAG = /^v\d+\.\d+\.\d+$/;
+/** `npm pack` derives this name from the package name `@gumi-conqueror/audio-decode`. */
+export function packageFilename(version) {
+  return `gumi-conqueror-audio-decode-${version}.tgz`;
+}
+
 // A tag promotes a successful main build. PR artifacts and rebuilt tag artifacts are ineligible.
 export function selectRun(runs, commit) {
   const run = runs
@@ -19,7 +26,7 @@ export function selectRun(runs, commit) {
 }
 
 export function verifyPackage({ tag, commit, lock, info, checksums, bytes }) {
-  assert.match(tag, /^v\d+\.\d+\.\d+$/, 'Use a stable vMAJOR.MINOR.PATCH tag');
+  assert.match(tag, RELEASE_TAG, 'Use a stable vMAJOR.MINOR.PATCH tag');
   assert.equal(info.version, tag.slice(1), 'Package and tag versions differ');
   assert.equal(info.commit, commit, 'Package was built from another commit');
   assert.equal(info.dirty, false, 'Package was built from a dirty checkout');
@@ -30,7 +37,7 @@ export function verifyPackage({ tag, commit, lock, info, checksums, bytes }) {
     createHash('sha256').update(lock).digest('hex'),
     'Cargo lockfile differs',
   );
-  const filename = `gumi-conqueror-audio-decode-${info.version}.tgz`;
+  const filename = packageFilename(info.version);
   const hash = createHash('sha256').update(bytes).digest('hex');
   assert.equal(checksums.trim(), `${hash}  ${filename}`, 'Package checksum or filename differs');
   return filename;
@@ -42,7 +49,7 @@ function main() {
   const repository = process.env.GITHUB_REPOSITORY;
   const tag = process.env.GITHUB_REF_NAME;
   assert.ok(repository && tag, 'Run this script in the tag release workflow');
-  assert.match(tag, /^v\d+\.\d+\.\d+$/);
+  assert.match(tag, RELEASE_TAG);
   const commit = capture('git', ['rev-parse', 'HEAD']);
   execFileSync('git', ['merge-base', '--is-ancestor', commit, 'origin/main']);
 
@@ -64,7 +71,7 @@ function main() {
   } else if (process.argv[2] === 'publish') {
     const info = JSON.parse(readFileSync('release/build-info.json', 'utf8'));
     // Derive the input path from the validated tag, never from downloaded metadata.
-    const filename = `gumi-conqueror-audio-decode-${tag.slice(1)}.tgz`;
+    const filename = packageFilename(tag.slice(1));
     const archive = `release/${filename}`;
     verifyPackage({
       tag,
