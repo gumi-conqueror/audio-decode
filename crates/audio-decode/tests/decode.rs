@@ -53,6 +53,23 @@ fn decode(name: &str) -> (audio_decode::AudioInfo, Vec<f32>) {
 }
 
 #[test]
+fn reports_frame_counts_that_containers_declare() {
+    let tone = tone();
+    let frames = (tone.samples / tone.channels) as u64;
+    for name in [
+        "tone.wav",
+        "tone.flac",
+        "tone.aiff",
+        "tone-alac.m4a",
+        "tone.mp3",
+        "tone.ogg",
+    ] {
+        let decoder = Decoder::from_bytes(fixture(name)).expect("open synthetic audio");
+        assert_eq!(decoder.info().frames, Some(frames), "{name}");
+    }
+}
+
+#[test]
 fn lossless_formats_preserve_rate_channels_and_pcm() {
     let tone = tone();
     let (reference, expected) = decode("tone.wav");

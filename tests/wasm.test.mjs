@@ -19,7 +19,12 @@ function decode(name) {
       assert.ok(chunk instanceof Float32Array);
       samples.push(...chunk);
     }
-    return { samples, rate: decoder.sampleRate, channels: decoder.channels };
+    return {
+      samples,
+      rate: decoder.sampleRate,
+      channels: decoder.channels,
+      frames: decoder.frames,
+    };
   } finally {
     decoder.free();
   }
@@ -30,9 +35,12 @@ test('WASM lossless output preserves exact PCM across containers', () => {
   assert.equal(expected.rate, tone.sampleRate);
   assert.equal(expected.channels, tone.channels);
   assert.equal(expected.samples.length, toneSamples);
-  for (const name of ['tone.flac', 'tone-alac.m4a', 'tone.aiff', 'tone.mka']) {
+  // The declared frame count is known before decoding; Matroska declares none.
+  assert.equal(expected.frames, tone.frames);
+  for (const name of ['tone.flac', 'tone-alac.m4a', 'tone.aiff']) {
     assert.deepEqual(decode(name), expected, name);
   }
+  assert.deepEqual(decode('tone.mka'), { ...expected, frames: undefined });
 });
 
 test('WASM supports compressed audio and gapless MP3/Vorbis', () => {

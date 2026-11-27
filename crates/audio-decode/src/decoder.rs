@@ -21,6 +21,9 @@ pub struct AudioInfo {
     pub channels: usize,
     /// Original decoded sample precision, when supplied by the codec.
     pub bits_per_sample: Option<u32>,
+    /// Frames per channel that the container declares before decoding, when it
+    /// declares a count. The decoded count can differ, for example after gapless trimming.
+    pub frames: Option<u64>,
 }
 
 /// A file cannot be opened or decoded without losing audio data.
@@ -130,6 +133,7 @@ impl Decoder {
             sample_rate: 0,
             channels: 0,
             bits_per_sample: params.bits_per_sample,
+            frames: track.num_frames,
         };
         let track_id = track.id;
         let mut result = Self {

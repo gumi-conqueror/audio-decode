@@ -43,7 +43,7 @@ The repository must have a published release before this remote installation wor
 Do not install the source checkout as an npm Git dependency: that checkout contains no prebuilt WASM.
 
 ```sh
-npm install --save-exact https://github.com/gumi-conqueror/audio-decode/releases/download/v0.1.0/gumi-conqueror-audio-decode-0.1.0.tgz
+npm install --save-exact https://github.com/gumi-conqueror/audio-decode/releases/download/v0.2.0/gumi-conqueror-audio-decode-0.2.0.tgz
 ```
 
 Use the decoder inside a module Worker:

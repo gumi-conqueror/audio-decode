@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "audio-decode"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde_json",
  "symphonia",
@@ -12,7 +12,7 @@ dependencies = [
 
 [[package]]
 name = "audio-decode-wasm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "audio-decode",
  "wasm-bindgen",

@@ -49,6 +49,16 @@ impl AudioDecoder {
         self.0.info().bits_per_sample
     }
 
+    /// Returns the frames per channel that the container declares before decoding.
+    ///
+    /// Returns `undefined` when the container declares no count. The decoded count
+    /// can differ, for example after gapless trimming.
+    #[wasm_bindgen(getter)]
+    pub fn frames(&self) -> Option<f64> {
+        // Frame counts stay far below 2^53, so the conversion is exact.
+        self.0.info().frames.map(|frames| frames as f64)
+    }
+
     /// Copies the next interleaved chunk into a new JavaScript Float32Array.
     ///
     /// Returns `undefined` at the end. The result does not borrow WASM memory.
